@@ -6,7 +6,8 @@ my_pass = ""
 my_charset = "utf8"
 
 # Set true when elasticsearch use https
-yfx_gateway = "http://localhost:4998/dbcast/mine939283"
+yfx_gateway = "http://ws.z.12zan.net/dbcast/some_channel_as_you_wish"
+# your own secret 
 yfx_secret = "hellloafsdfefss9843ru93f"
 # Path to store data, like master.info, if not set or empty,
 # we must use this to support breakpoint resume syncing. 

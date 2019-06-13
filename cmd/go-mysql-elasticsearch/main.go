@@ -9,14 +9,15 @@ import (
 
 	"github.com/juju/errors"
 	"github.com/siddontang/go-log/log"
-	"github.com/siddontang/go-mysql-elasticsearch/river"
+	"github.com/yuanfenxi/yuanlicast/river"
 )
 
 var configFile = flag.String("config", "./etc/river.toml", "go-mysql-elasticsearch config file")
 var my_addr = flag.String("my_addr", "", "MySQL addr")
 var my_user = flag.String("my_user", "", "MySQL user")
 var my_pass = flag.String("my_pass", "", "MySQL password")
-var es_addr = flag.String("es_addr", "", "Elasticsearch addr")
+var secret = flag.String("secret","fdsifsdfdf","yuanli broadcast server secret")
+var yfx_gateway = flag.String("yfx_gateway", "", "yuanli broadcast server addr")
 var data_dir = flag.String("data_dir", "", "path for go-mysql-elasticsearch to save data")
 var server_id = flag.Int("server_id", 0, "MySQL server id, as a pseudo slave")
 var flavor = flag.String("flavor", "", "flavor: mysql or mariadb")
@@ -60,8 +61,11 @@ func main() {
 		cfg.ServerID = uint32(*server_id)
 	}
 
-	if len(*es_addr) > 0 {
-		cfg.ESAddr = *es_addr
+	if len(*yfx_gateway) > 0 {
+		cfg.YfxGateway = *yfx_gateway
+	}
+	if len(*secret) >0 {
+		cfg.YfxSecret = *secret
 	}
 
 	if len(*data_dir) > 0 {

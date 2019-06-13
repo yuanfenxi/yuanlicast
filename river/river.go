@@ -9,8 +9,8 @@ import (
 
 	"github.com/juju/errors"
 	"github.com/siddontang/go-log/log"
-	"github.com/siddontang/go-mysql-elasticsearch/elastic"
 	"github.com/siddontang/go-mysql/canal"
+	"github.com/yuanfenxi/yuanlicast/yfxcast"
 )
 
 // ErrRuleNotExist is the error if rule is not defined.
@@ -31,7 +31,7 @@ type River struct {
 
 	wg sync.WaitGroup
 
-	es *elastic.Client
+	es *yfxcast.Client
 
 	st *stat
 
@@ -70,14 +70,7 @@ func NewRiver(c *Config) (*River, error) {
 	if err = r.canal.CheckBinlogRowImage("FULL"); err != nil {
 		return nil, errors.Trace(err)
 	}
-
-	cfg := new(elastic.ClientConfig)
-	cfg.Addr = r.c.ESAddr
-	cfg.User = r.c.ESUser
-	cfg.Password = r.c.ESPassword
-	cfg.HTTPS = r.c.ESHttps
-	r.es = elastic.NewClient(cfg)
-
+	r.es = yfxcast.NewClient(c.YfxGateway,c.YfxSecret)
 	r.st = &stat{r: r}
 	go r.st.Run(r.c.StatAddr)
 

@@ -10,7 +10,7 @@ import (
 
 	"github.com/juju/errors"
 	"github.com/siddontang/go-log/log"
-	"github.com/siddontang/go-mysql-elasticsearch/elastic"
+	"github.com/yuanfenxi/yuanlicast/yfxcast"
 	"github.com/siddontang/go-mysql/canal"
 	"github.com/siddontang/go-mysql/mysql"
 	"github.com/siddontang/go-mysql/replication"
@@ -76,7 +76,7 @@ func (h *eventHandler) OnRow(e *canal.RowsEvent) error {
 		return nil
 	}
 
-	var reqs []*elastic.BulkRequest
+	var reqs []*yfxcast.BulkRequest
 	var err error
 	switch e.Action {
 	case canal.InsertAction:
@@ -127,7 +127,7 @@ func (r *River) syncLoop() {
 	defer r.wg.Done()
 
 	lastSavedTime := time.Now()
-	reqs := make([]*elastic.BulkRequest, 0, 1024)
+	reqs := make([]*yfxcast.BulkRequest, 0, 1024)
 
 	var pos mysql.Position
 
@@ -137,8 +137,10 @@ func (r *River) syncLoop() {
 
 		select {
 		case v := <-r.syncCh:
+
 			switch v := v.(type) {
 			case posSaver:
+
 				now := time.Now()
 				if v.force || now.Sub(lastSavedTime) > 3*time.Second {
 					lastSavedTime = now
@@ -146,7 +148,8 @@ func (r *River) syncLoop() {
 					needSavePos = true
 					pos = v.pos
 				}
-			case []*elastic.BulkRequest:
+			case []*yfxcast.BulkRequest:
+
 				reqs = append(reqs, v...)
 				needFlush = len(reqs) >= bulkSize
 			}
@@ -177,8 +180,8 @@ func (r *River) syncLoop() {
 }
 
 // for insert and delete
-func (r *River) makeRequest(rule *Rule, action string, rows [][]interface{}) ([]*elastic.BulkRequest, error) {
-	reqs := make([]*elastic.BulkRequest, 0, len(rows))
+func (r *River) makeRequest(rule *Rule, action string, rows [][]interface{}) ([]*yfxcast.BulkRequest, error) {
+	reqs := make([]*yfxcast.BulkRequest, 0, len(rows))
 
 	for _, values := range rows {
 		id, err := r.getDocID(rule, values)
@@ -193,10 +196,10 @@ func (r *River) makeRequest(rule *Rule, action string, rows [][]interface{}) ([]
 			}
 		}
 
-		req := &elastic.BulkRequest{Index: rule.Index, Type: rule.Type, ID: id, Parent: parentID, Pipeline: rule.Pipeline}
+		req := &yfxcast.BulkRequest{Index: rule.Index, Type: rule.Type, ID: id, Parent: parentID}
 
 		if action == canal.DeleteAction {
-			req.Action = elastic.ActionDelete
+			req.Action = yfxcast.ActionDelete
 			r.st.DeleteNum.Add(1)
 		} else {
 			r.makeInsertReqData(req, rule, values)
@@ -209,20 +212,20 @@ func (r *River) makeRequest(rule *Rule, action string, rows [][]interface{}) ([]
 	return reqs, nil
 }
 
-func (r *River) makeInsertRequest(rule *Rule, rows [][]interface{}) ([]*elastic.BulkRequest, error) {
+func (r *River) makeInsertRequest(rule *Rule, rows [][]interface{}) ([]*yfxcast.BulkRequest, error) {
 	return r.makeRequest(rule, canal.InsertAction, rows)
 }
 
-func (r *River) makeDeleteRequest(rule *Rule, rows [][]interface{}) ([]*elastic.BulkRequest, error) {
+func (r *River) makeDeleteRequest(rule *Rule, rows [][]interface{}) ([]*yfxcast.BulkRequest, error) {
 	return r.makeRequest(rule, canal.DeleteAction, rows)
 }
 
-func (r *River) makeUpdateRequest(rule *Rule, rows [][]interface{}) ([]*elastic.BulkRequest, error) {
+func (r *River) makeUpdateRequest(rule *Rule, rows [][]interface{}) ([]*yfxcast.BulkRequest, error) {
 	if len(rows)%2 != 0 {
 		return nil, errors.Errorf("invalid update rows event, must have 2x rows, but %d", len(rows))
 	}
 
-	reqs := make([]*elastic.BulkRequest, 0, len(rows))
+	reqs := make([]*yfxcast.BulkRequest, 0, len(rows))
 
 	for i := 0; i < len(rows); i += 2 {
 		beforeID, err := r.getDocID(rule, rows[i])
@@ -246,13 +249,13 @@ func (r *River) makeUpdateRequest(rule *Rule, rows [][]interface{}) ([]*elastic.
 			}
 		}
 
-		req := &elastic.BulkRequest{Index: rule.Index, Type: rule.Type, ID: beforeID, Parent: beforeParentID}
+		req := &yfxcast.BulkRequest{Index: rule.Index, Type: rule.Type, ID: beforeID, Parent: beforeParentID}
 
 		if beforeID != afterID || beforeParentID != afterParentID {
-			req.Action = elastic.ActionDelete
+			req.Action = yfxcast.ActionDelete
 			reqs = append(reqs, req)
 
-			req = &elastic.BulkRequest{Index: rule.Index, Type: rule.Type, ID: afterID, Parent: afterParentID, Pipeline: rule.Pipeline}
+			req = &yfxcast.BulkRequest{Index: rule.Index, Type: rule.Type, ID: afterID, Parent: afterParentID}
 			r.makeInsertReqData(req, rule, rows[i+1])
 
 			r.st.DeleteNum.Add(1)
@@ -261,9 +264,7 @@ func (r *River) makeUpdateRequest(rule *Rule, rows [][]interface{}) ([]*elastic.
 			if len(rule.Pipeline) > 0 {
 				// Pipelines can only be specified on index action
 				r.makeInsertReqData(req, rule, rows[i+1])
-				// Make sure action is index, not create
-				req.Action = elastic.ActionIndex
-				req.Pipeline = rule.Pipeline
+
 			} else {
 				r.makeUpdateReqData(req, rule, rows[i], rows[i+1])
 			}
@@ -359,22 +360,22 @@ func (r *River) getFieldParts(k string, v string) (string, string, string) {
 	composedField := strings.Split(v, ",")
 
 	mysql := k
-	elastic := composedField[0]
+	yfxcast := composedField[0]
 	fieldType := ""
 
-	if 0 == len(elastic) {
-		elastic = mysql
+	if 0 == len(yfxcast) {
+		yfxcast = mysql
 	}
 	if 2 == len(composedField) {
 		fieldType = composedField[1]
 	}
 
-	return mysql, elastic, fieldType
+	return mysql, yfxcast, fieldType
 }
 
-func (r *River) makeInsertReqData(req *elastic.BulkRequest, rule *Rule, values []interface{}) {
+func (r *River) makeInsertReqData(req *yfxcast.BulkRequest, rule *Rule, values []interface{}) {
 	req.Data = make(map[string]interface{}, len(values))
-	req.Action = elastic.ActionIndex
+	req.Action = yfxcast.ActionInsert
 
 	for i, c := range rule.TableInfo.Columns {
 		if !rule.CheckFilter(c.Name) {
@@ -382,10 +383,10 @@ func (r *River) makeInsertReqData(req *elastic.BulkRequest, rule *Rule, values [
 		}
 		mapped := false
 		for k, v := range rule.FieldMapping {
-			mysql, elastic, fieldType := r.getFieldParts(k, v)
+			mysql, yfxcast, fieldType := r.getFieldParts(k, v)
 			if mysql == c.Name {
 				mapped = true
-				req.Data[elastic] = r.getFieldValue(&c, fieldType, values[i])
+				req.Data[yfxcast] = r.getFieldValue(&c, fieldType, values[i])
 			}
 		}
 		if mapped == false {
@@ -394,12 +395,12 @@ func (r *River) makeInsertReqData(req *elastic.BulkRequest, rule *Rule, values [
 	}
 }
 
-func (r *River) makeUpdateReqData(req *elastic.BulkRequest, rule *Rule,
+func (r *River) makeUpdateReqData(req *yfxcast.BulkRequest, rule *Rule,
 	beforeValues []interface{}, afterValues []interface{}) {
 	req.Data = make(map[string]interface{}, len(beforeValues))
 
 	// maybe dangerous if something wrong delete before?
-	req.Action = elastic.ActionUpdate
+	req.Action = yfxcast.ActionUpdate
 
 	for i, c := range rule.TableInfo.Columns {
 		mapped := false
@@ -411,10 +412,10 @@ func (r *River) makeUpdateReqData(req *elastic.BulkRequest, rule *Rule,
 			continue
 		}
 		for k, v := range rule.FieldMapping {
-			mysql, elastic, fieldType := r.getFieldParts(k, v)
+			mysql, yfxcast, fieldType := r.getFieldParts(k, v)
 			if mysql == c.Name {
 				mapped = true
-				req.Data[elastic] = r.getFieldValue(&c, fieldType, afterValues[i])
+				req.Data[yfxcast] = r.getFieldValue(&c, fieldType, afterValues[i])
 			}
 		}
 		if mapped == false {
@@ -471,23 +472,14 @@ func (r *River) getParentID(rule *Rule, row []interface{}, columnName string) (s
 	return fmt.Sprint(row[index]), nil
 }
 
-func (r *River) doBulk(reqs []*elastic.BulkRequest) error {
+func (r *River) doBulk(reqs []*yfxcast.BulkRequest) error {
 	if len(reqs) == 0 {
 		return nil
 	}
 
-	if resp, err := r.es.Bulk(reqs); err != nil {
+	if  err := r.es.Bulk(reqs); err != nil {
 		log.Errorf("sync docs err %v after binlog %s", err, r.canal.SyncedPosition())
 		return errors.Trace(err)
-	} else if resp.Code/100 == 2 || resp.Errors {
-		for i := 0; i < len(resp.Items); i++ {
-			for action, item := range resp.Items[i] {
-				if len(item.Error) > 0 {
-					log.Errorf("%s index: %s, type: %s, id: %s, status: %d, error: %s",
-						action, item.Index, item.Type, item.ID, item.Status, item.Error)
-				}
-			}
-		}
 	}
 
 	return nil

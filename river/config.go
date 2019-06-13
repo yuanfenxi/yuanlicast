@@ -21,10 +21,8 @@ type Config struct {
 	MyPassword string `toml:"my_pass"`
 	MyCharset  string `toml:"my_charset"`
 
-	ESHttps    bool   `toml:"es_https"`
-	ESAddr     string `toml:"es_addr"`
-	ESUser     string `toml:"es_user"`
-	ESPassword string `toml:"es_pass"`
+	YfxGateway string `toml:"yfx_gateway"`
+	YfxSecret  string `toml:"yfx_secret"`
 
 	StatAddr string `toml:"stat_addr"`
 

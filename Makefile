@@ -2,6 +2,10 @@ all: build
 
 build: build-elasticsearch
 
+fast:
+	go build -o bin/go-mysql-elasticsearch ./cmd/go-mysql-elasticsearch
+	bin/go-mysql-elasticsearch
+
 build-elasticsearch:
 	GO111MODULE=on go build -o bin/go-mysql-elasticsearch ./cmd/go-mysql-elasticsearch
 

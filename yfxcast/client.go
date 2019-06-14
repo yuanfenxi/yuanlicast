@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 	"github.com/juju/errors"
+	"github.com/dgrijalva/jwt-go"
 )
 
 // Although there are many Elasticsearch clients with Go, I still want to implement one by myself.
@@ -157,9 +158,22 @@ func (c *Client) Do(method string, url string, body map[string]interface{}) (*Re
 func (c *Client) ExecutePostQuery(buf *bytes.Buffer)(error){
 
 	url_to_post :=  c.Addr
-	params:=url.Values{}
+
 	// params.Set("hello","fdsfs")
-	params.Set("data",buf.String())
+
+	secret := []byte(c.AppSecret)
+
+	claims := &jwt.StandardClaims{
+		ExpiresAt: 60,
+		Subject: buf.String()}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	encodedString, err := token.SignedString(secret)
+	if err!=nil {
+		return err
+	}
+	params:=url.Values{}
+	params.Set("data",encodedString)
 
 	resp, err := http.PostForm(url_to_post, params)
 	if err != nil {

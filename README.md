@@ -3,7 +3,7 @@
 go-mysql-elasticsearch是一个golang包，可以以一个MysqlServer的salve的身份，监听mysql的数据变更，并将变更导入到elasticsearch。
 我看到这个包的想法是，是否可以稍做修改，当mysql数据库有变更时，将变更广播到消息队列中去,增强及时性？
 
-昨天睡前喝了点小酒，拿着elasticsearch的代码就开始动刀了，我把访问elasticsearch的那一部分删掉，改成提交数据到ws.z.12zan.net 到凌晨1点的时候已经基本完成了。
+昨天睡前喝了点小酒，拿着elasticsearch的代码就开始动刀了，我把访问elasticsearch的那一部分删掉，改成提交数据到ws.z.12zan.net 到凌晨1点的时候已经基本完成了。关于我们的这个简单的消息队列，或者叫广播，可以参见:[https://segmentfault.com/a/1190000017008772](https://segmentfault.com/a/1190000017008772)。
 
 源代码放在:[https://github.com/yuanfenxi/yuanlicast](https://github.com/yuanfenxi/yuanlicast)上了。
 
